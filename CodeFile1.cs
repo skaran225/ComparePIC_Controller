@@ -10,7 +10,6 @@ using System.Threading;
 using Microsoft.Win32;
 using System.Runtime.InteropServices;
 using System.ComponentModel;
-using Microsoft;
 
 namespace PIC
 {
@@ -20,11 +19,6 @@ namespace PIC
         public static int iWait = 1;
         public static string sOS = "XP";
         public static int iProtocol = 2;
-        public static int nothing = 1;
-        public static bool displayBill = true;
-        public static bool requestCancel = false;
-        public static int inputType = 1;
-        public static int bEmMode = 0;
 
         [DllImport("Kernel32.dll")]
         public static extern bool SetLocalTime(ref SYSTEMTIME Time);
@@ -35,10 +29,8 @@ namespace PIC
         public static bool bPrintRequest = false;
         public static bool bTestRequest = false;
         public static bool bStatusRequest = false;
-        public static bool bPrintWait = false;
 
         public static bool bPreSwipe = false;
-
         public static bool bPreInput = false;
 
         static int iScreenMode;
@@ -148,51 +140,6 @@ namespace PIC
             SetLocalTime(ref st);
         }
 
-        //private static string GetMachineGUID()
-        //{
-            //try
-            //{
-
-
-            //    string x64Result = string.Empty;
-            //    string x86Result = string.Empty;
-
-            //    string location = @"SOFTWARE\Microsoft\Cryptography";
-            //    string name = "MachineGuid";
-
-            //    using (RegistryKey localMachineX64View = RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
-            //    {
-
-            //    } 
-
-
-            //}
-            //catch (Exception)
-            //{
-            //}
-            //string registryValue = string.Empty;
-            //RegistryKey localKey = null;
-            //if (Environment.Is64BitOperatingSystem)
-            //{
-            //    localKey = RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, RegistryView.Registry64);
-            //}
-            //else
-            //{
-            //    localKey = RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, RegistryView.Registry32);
-            //}
-
-            //try
-            //{
-            //    localKey = localKey.OpenSubKey(@"Software\\MyKey");
-            //    registryValue = localKey.GetValue("TestKey").ToString();
-            //}
-            //catch (NullReferenceException nre)
-            //{
-
-            //}
-            //return registryValue;
-        //}
-
         public static void StartUp()
         {
             Debug.WriteLine("OS = " + sOS);
@@ -207,19 +154,13 @@ namespace PIC
                 FileAccessXP.ReadSettings(); 
             }
 
-
-
-
-
-
-
             Display.Init();
 
-            EPP.Init();//PD- wait until msg box below disappears otherwise new readsettings code will cause app to crash (port nums not set in time)
-            CardReader.Init();
-            CashAcceptor.Init();
-            Printer.Init();
-            RS485.Init();
+            //EPP.Init();//PD- wait until msg box below disappears otherwise new readsettings code will cause app to crash (port nums not set in time)
+            //CardReader.Init();
+            //CashAcceptor.Init();
+            //Printer.Init();
+            //RS485.Init();
 
             Reset();
 
@@ -232,7 +173,6 @@ namespace PIC
 
         public static void Reset()
         {
-            displayBill = true;
             bBillRequest = false;
             bCardRequest = false;
             Debug.WriteLine("******************bCardRequest1= " + bCardRequest);
@@ -344,9 +284,111 @@ namespace PIC
             }
             else
             {
-                
+                if (IsMainDoorClosed() && bMainDoorOpen)
+                {
+                    bMainDoorOpen = false;
+                    RS485.SendGNS();
 
-                
+                    Debug.WriteLine("main door closed");
+
+                    if (iLoggingSSC == 1)
+                    {
+                        try
+                        {
+                            RS485.WriteLogData_TX(Environment.NewLine + "TX> " + DateTime.Now.ToString("HH:mm:ss:ffff") + " -- ");
+                            RS485.WriteLogData_TX("main door closed");
+                        }
+                        catch { }
+                    }
+
+                    if (bTestMode && iScreenTimer == 0)//trigger main screen only if test mode and timer ==0
+                    {
+                        iScreenTimer = 1;
+                    }
+                    //RS485.SendCancel();//PD- taken care of when timer == 0... go to main screen if door closed
+                }
+                else if (IsMainDoorClosed() == false && bMainDoorOpen == false)
+                {
+                    bMainDoorOpen = true;
+                    Debug.WriteLine("main door opened");
+                    if (iLoggingSSC == 1)
+                    {
+                        try
+                        {
+                            RS485.WriteLogData_TX(Environment.NewLine + "TX> " + DateTime.Now.ToString("HH:mm:ss:ffff") + " -- ");
+                            RS485.WriteLogData_TX("main door opened");
+                        }
+                        catch { }
+                    }
+                    RS485.SendGNS();
+                }
+                if (IsVaultDoorClosed() && bVaultDoorOpen)
+                {
+                    bVaultDoorOpen = false;
+                    Debug.WriteLine("vault door closed");
+                    if (iLoggingSSC == 1)
+                    {
+                        try
+                        {
+                            RS485.WriteLogData_TX(Environment.NewLine + "TX> " + DateTime.Now.ToString("HH:mm:ss:ffff") + " -- ");
+                            RS485.WriteLogData_TX("vault door closed");
+                        }
+                        catch { }
+                    }
+                    RS485.SendGNS();
+
+                }
+                else if (IsVaultDoorClosed() == false && bVaultDoorOpen == false)
+                {
+                    bVaultDoorOpen = true;
+                    Debug.WriteLine("vault door opened");
+                    if (iLoggingSSC == 1)
+                    {
+                        try
+                        {
+                            RS485.WriteLogData_TX(Environment.NewLine + "TX> " + DateTime.Now.ToString("HH:mm:ss:ffff") + " -- ");
+                            RS485.WriteLogData_TX("vault door opened");
+                        }
+                        catch { }
+                    }
+                    RS485.SendGNS();
+
+                }
+
+                if (bAlarmEnabled == false)
+                {
+                    if (bMainDoorOpen == false && bVaultDoorOpen == false && bTestMode == false)//pd- don't enable alarm if in test mode - forces doors to be closed
+                    //if (bVaultDoorOpen == false && bTestMode == false)
+                    {
+                        bAlarmEnabled = true;
+                        if (iLoggingSSC == 1)
+                        {
+                            try
+                            {
+                                RS485.WriteLogData_TX(Environment.NewLine + "TX> " + DateTime.Now.ToString("HH:mm:ss:ffff") + " -- ");
+                                RS485.WriteLogData_TX("alarm enabled");
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                else
+                {
+                    if (bMainDoorOpen || bVaultDoorOpen)
+                    //if (bVaultDoorOpen)
+                    {
+                        AlarmOn();
+                        if (iLoggingSSC == 1)
+                        {
+                            try
+                            {
+                                RS485.WriteLogData_TX(Environment.NewLine + "TX> " + DateTime.Now.ToString("HH:mm:ss:ffff") + " -- ");
+                                RS485.WriteLogData_TX("alarm on");
+                            }
+                            catch { }
+                        }
+                    }
+                }
 
                 if ((Display.iCurrentScreen == 0 && Display.iScreenMode == 0) || Display.iCurrentScreen == 1 || Display.iCurrentScreen == 21 || bForceCheck == true)
                 {
@@ -364,11 +406,7 @@ namespace PIC
                                 EPP.CheckStatus();
                             }
                             CardReader.CheckStatus();
-
-                            if (CenCom.bEmMode != 1)
-                            {
-                                CashAcceptor.bWaitingForResponse = true;//PD- rev21 - otherwise doesn't know if offline
-                            }
+                            CashAcceptor.bWaitingForResponse = true;//PD- rev21 - otherwise doesn't know if offline
                             //CashAcceptor.CheckStatus();//always check ca status....sent below
                             RS485.bWaitingForResponse = true;//PD- use to trigger code in rs485 class
 
@@ -390,14 +428,14 @@ namespace PIC
                     }
                     else if (iStatusCheckCount == 2)
                     {
-                        if (RS485.bWaitingForResponse == true && RS485.iStatus > 0)
-                        {
-                            //RS485.Init();//try to re-open and re-init port
-                            RS485.iStatus = 0;
-                            //RS485.bWaitingForResponse = false;
-                            Debug.WriteLine("RS485 Offline");
-                            //RS485.bConfig = false;
-                        }
+                        //if (RS485.bWaitingForResponse == true && RS485.iStatus > 0)
+                        //{
+                        //    //RS485.Init();//try to re-open and re-init port
+                        //    RS485.iStatus = 0;
+                        //    //RS485.bWaitingForResponse = false;
+                        //    Debug.WriteLine("RS485 Offline");
+                        //    RS485.bConfig = false;
+                        //}
                         if (EPP.bWaitingForResponse == true && EPP.iStatus > 0)
                         {
                             //EPP.Init();//try to re-open and re-init port
@@ -453,26 +491,24 @@ namespace PIC
                     Debug.WriteLine("ptr status: " + Printer.iStatus);
                     Debug.WriteLine("485 status: " + RS485.iStatus);
 
-                    if (iOverallStatus == 0)//offline->online
-                    {
-                        if (EPP.iStatus == 1 && RS485.iStatus == 1 && (CashAcceptor.iStatus == 1 || CardReader.iStatus == 1))
-                        {
-                            iOverallStatus = 1;
-                            Display.GotoScreen(1, 0);
-                        }
-                        
-                    }
-                    else//online->offline
-                    {
-                        if (EPP.iStatus == 0 || RS485.iStatus == 0 || (CashAcceptor.iStatus == 0 && CardReader.iStatus == 0))
-                        {
-                            iOverallStatus = 0;
-                            Display.GotoScreen(0, 0);
-                        }
-                    }
+                    //if (iOverallStatus == 0)//offline->online
+                    //{
+                    //    if (EPP.iStatus == 1 && RS485.iStatus == 1 && (CashAcceptor.iStatus==1 || CardReader.iStatus==1))
+                    //    {
+                    //        iOverallStatus = 1;
+                    //        Display.GotoScreen(1, 0);
+                    //    }
+                    //}
+                    //else//online->offline
+                    //{
+                    //    if (EPP.iStatus == 0 || RS485.iStatus == 0 || (CashAcceptor.iStatus == 0 && CardReader.iStatus == 0))
+                    //    {
+                    //        iOverallStatus = 0;
+                    //        Display.GotoScreen(0, 0);
+                    //    }
+                    //}
                 }
 
-                //Check RS485 Communication and set to 0 after 30 seconds of no monitor
                 i485Monitor++;
                 //CE - changed from > 15 to > 30 since reboot takes longer
                 if (i485Monitor > 30 && RS485.iStatus > 0)
@@ -507,7 +543,28 @@ namespace PIC
                         
                     //CE - xp relied on launch - Application.Exit();//PD - rev 19
                     Debug.WriteLine("GOODBYE");
-                    
+                    try
+                    {
+                        Process pNew = null;
+
+                        pNew = new Process();
+
+                        if (File.Exists("\\SDCard\\BOOT.exe"))
+                        {
+                            pNew.StartInfo.FileName = "\\SDCard\\BOOT.exe";
+
+                            pNew.Start();
+                        }
+                        else
+                        {
+                            pNew.StartInfo.FileName = "\\SDCard\\SPT\\SPT.exe";
+
+                            pNew.Start();
+
+                            Application.Exit();//PD - rev 19
+                        }
+                    }
+                    catch { Debug.WriteLine("GOODBYE ERROR"); }
                 }
 
                 if (bPrintRequest == true)//won't set until already have data to print so check after know customer wants car wash... force check when enter screen 1 for reg. receipt...so bforcecheck should be false by now
@@ -633,7 +690,28 @@ namespace PIC
                                 Display.GotoScreen(14, 20);//set mode to 1 to detect this exact screen when timeout occurs...
                                 //iScreenTimer = 10;PD-set in GOTOSCREEN method
                             }
-                           
+                            //else if (bCashTransaction)
+                            //{
+                            //    if (CenCom.bSpanish)
+                            //    {
+                            //        Display.screen0.SetText(Display.screen0.lMsg, "Por favor tome su recibo.\n\nGracias por escoger ARCO.");
+                            //    }
+                            //    else
+                            //    {
+                            //        Display.screen0.SetText(Display.screen0.lMsg, "Please take your receipt.\n\nThank you for choosing ARCO.");
+                            //    }
+                            //}
+                            //else
+                            //{
+                            //    if (CenCom.bSpanish)
+                            //    {
+                            //        Display.screen0.SetText(Display.screen0.lMsg, "Bomba " + CenCom.sPump + " esta lista.\n\nPor favor regrese por su recibo.");
+                            //    }
+                            //    else
+                            //    {
+                            //        Display.screen0.SetText(Display.screen0.lMsg, "Pump " + CenCom.sPump + " is ready.\n\nPlease return for receipt.");
+                            //    }
+                            //}
                         }
                     }
                 }
@@ -687,14 +765,14 @@ namespace PIC
                     Display.ShowMessageBox(sStatus, 3);
                 }
 
-                //if (Display.iCurrentScreen == 1 && CardReader.bCardInserted == true && CardReader.bCardLock == false)
-                //{
-                //    CardReader.iCardInsertedTimer++;
-                //    if (CardReader.iCardInsertedTimer == 5)
-                //    {
-                //        CardReader.bCardLock = true;
-                //    }
-                //}
+                if (Display.iCurrentScreen == 1 && CardReader.bCardInserted == true && CardReader.bCardLock == false)
+                {
+                    CardReader.iCardInsertedTimer++;
+                    if (CardReader.iCardInsertedTimer == 5)
+                    {
+                        CardReader.bCardLock = true;
+                    }
+                }
 
                 if (bBillRequest == true)//need to constantly send...assume on screen 26, 3, ... where bills are accepted
                 {
@@ -817,8 +895,6 @@ namespace PIC
 
         public static bool IsMainDoorClosed()
         {
-            return true;
-            /*
             if (EPP.PortEPP.IsOpen)
             {
                 if (sOS == "XP")
@@ -834,45 +910,32 @@ namespace PIC
             {
                 return false;
             }
-            */
         }
 
         public static bool IsVaultDoorClosed()
         {
-            //override
-            return true;
-          /*  
-            if (sos == "xp" && cashacceptor.portca.isopen)
+            if (sOS == "XP" && CashAcceptor.PortCA.IsOpen)
             {
-                return cashacceptor.portca.dsrholding;
+                return CashAcceptor.PortCA.DsrHolding;
             }
-            else if (sos == "ce" && printer.portptr.isopen)
+            else if (sOS == "CE" && Printer.PortPTR.IsOpen)
             {
-                return printer.portptr.ctsholding;
+                return Printer.PortPTR.CtsHolding;
             }
             else
             {
                 return false;
             }
-            */
         }
 
         public static void MyUpdateStatus()
         {
             Debug.WriteLine("Update Status. EPP = " + iEPPStatus + "/" + EPP.iStatus + " CR = " + iCRStatus + " / " + CardReader.iStatus + " CA = " + iCAStatus + "/" + CashAcceptor.iStatus + " PR = " + iPRStatus + "/" + Printer.iStatus);
 
-            if (CenCom.inputType == 1)
+            if (iEPPStatus != EPP.iStatus)
             {
-                if (iEPPStatus != EPP.iStatus)
-                {
-                    iEPPStatus = EPP.iStatus;
-                    RS485.MySendStatus(1, iEPPStatus);
-                }
-            }
-            //Force touchscreen status update to 1
-            if (CenCom.inputType == 2)
-            {
-                RS485.MySendStatus(1, 1);
+                iEPPStatus = EPP.iStatus;
+                RS485.MySendStatus(1, iEPPStatus);
             }
             if (iCRStatus != CardReader.iStatus)
             {
@@ -959,16 +1022,16 @@ namespace PIC
                     if (bSpanish)
                     {
                         bSpanish = false;
-                        Display.screen0.SetText(Display.screen0.lPromptChoices, "Would you like to pump gas or get receipt?");
-                        Display.screen0.SetText(Display.screen0.lChoices, "Press 1 to Pump Gas.\nPress 2 to Get Receipt.");
-                        Display.screen0.SetText(Display.screen0.lPromptBottom, "Pump " + CenCom.sPump + " selected.");
+                        Display.screen0.SetText(Display.screen0.lPromptChoices, "\nWould you like to pump gas or get receipt?");
+                        Display.screen0.SetText(Display.screen0.lChoices, "\nPress 1 to Pump Gas.\nPress 2 to Get Receipt.");
+                        Display.screen0.SetText(Display.screen0.lPromptBottom, "\n\nPump " + CenCom.sPump + " selected.");
                     }
                     else
                     {
                         bSpanish = true;
-                        Display.screen0.SetText(Display.screen0.lPromptChoices, "" + Convert.ToChar(191) + "Desearia llenar tanque o tomar su recibo?");
-                        Display.screen0.SetText(Display.screen0.lChoices, "Presionar 1 para llenar tanque.\nPresionar 2 para su recibo.");
-                        Display.screen0.SetText(Display.screen0.lPromptBottom, "Bomba " + CenCom.sPump + " seleccionada.");
+                        Display.screen0.SetText(Display.screen0.lPromptChoices, "\n" + Convert.ToChar(191) + "Desearia llenar tanque o tomar su recibo?");
+                        Display.screen0.SetText(Display.screen0.lChoices, "\nPresionar 1 para llenar tanque.\nPresionar 2 para su recibo.");
+                        Display.screen0.SetText(Display.screen0.lPromptBottom, "\n\nBomba " + CenCom.sPump + " seleccionada.");
                     }
                 }
                 else
@@ -992,7 +1055,7 @@ namespace PIC
                         CenCom.iScreenTimer = 60;
                     }
                 }
-                else//screen = 2 Enter pump number with s input and hidden logo
+                else//screen = 2
                 {
                     CenCom.iScreenTimer = 10;
                 }
@@ -1109,22 +1172,22 @@ namespace PIC
                             sCode = "63";
                             Display.GotoScreen(0, 1);
                         }
-                        else if (Display.iScreenMode == 1 && sCode == "99" && sInput == "4841")
+                        else if (Display.iScreenMode == 1 && sCode == "99" && sInput == "8324")
                         {
                             bTestMode = true;
                             Display.GotoScreen(21, 1);
                         }
-                        else if (Display.iScreenMode == 1 && sCode == "90" && sInput == "4534")
+                        else if (Display.iScreenMode == 1 && sCode == "90" && sInput == "5357")
                         {
                             bTestMode = true;
                             Display.GotoScreen(21, 2);
                         }
-                        else if (Display.iScreenMode == 1 && sCode == "63" && sInput == "6554")
+                        else if (Display.iScreenMode == 1 && sCode == "63" && sInput == "4364")
                         {
                             bTestMode = true;
                             Display.GotoScreen(21, 3);
                         }
-                        else if (Display.iScreenMode == 1 && sCode == "71" && sInput == "4565")
+                        else if (Display.iScreenMode == 1 && sCode == "71" && sInput == "2435")
                         {
                             bTestMode = true;
                             Display.GotoScreen(21, 0);
@@ -1407,55 +1470,20 @@ namespace PIC
             {
                 if (iKey == 13)
                 {
-                    //Show Msg Box with Question if this is the first time
-                    if (!requestCancel && CashAcceptor.iStatus != 3 && CashAcceptor.iStatus != 4)
+                    if (CashAcceptor.iStatus != 3 && CashAcceptor.iStatus != 4)//don't allow while accepting
                     {
                         CashAcceptor.Disable();
+                        RS485.SendCancel();
                         CashAcceptor.iBillTotal = 0;
                         CenCom.bBillRequest = false;
-                        requestCancel = true;
-                        Display.screen0.SetText(Display.screen0.lPromptTop, "Are you sure you want to Cancel?\nPress 1 to Cancel. Press 2 to Continue.");
-                        Display.screen0.SetText(Display.screen0.lPromptBottom, "");
                     }
-                    //else if (CashAcceptor.iStatus != 3 && CashAcceptor.iStatus != 4)//don't allow while accepting
-                    //{
-                    //    CashAcceptor.Disable();
-                    //    RS485.SendCancel();
-                    //    CashAcceptor.iBillTotal = 0;
-                    //    CenCom.Reset();
-                    //    CenCom.bBillRequest = false;
-                    //}
                 }
-                if (iKey == 1 && requestCancel)
-                {
-                    //Execute Cancel
-                    CashAcceptor.Disable();
-                    RS485.SendCancel();//Send twice because server needs confirmation
-                    RS485.SendCancel();
-                    Display.ShowMessageBox("Your transaction has been canceled.\n\nPlease retrieve your change from\ninside the store.", 5);
-                    CashAcceptor.iBillTotal = 0;                   
-                    CenCom.bBillRequest = false;
-                    requestCancel = false;
-                    CenCom.Reset();
-                }
-                else if (iKey == 2 && requestCancel)
-                {
-                    //Continue
-                    CashAcceptor.Enable();
-                    CashAcceptor.iBillVal = 0;
-                    CenCom.bBillRequest = true;
-                    Display.screen0.SetText(Display.screen0.lPromptTop, "Insert bills and press ENTER after last bill.\nTotal dollar amount accepted:");
-                    Display.screen0.SetText(Display.screen0.lPromptBottom, "");
-                    requestCancel = false;
-                }
-
                 else if (iKey == 15)
                 {
                     if (CashAcceptor.iStatus != 3 && CashAcceptor.iStatus != 4)//don't allow while accepting
                     {
                         CashAcceptor.Disable();
                         RS485.SendEnter();
-                        CenCom.Reset();
                         CashAcceptor.iBillTotal = 0;
                         CenCom.bBillRequest = false;
                     }
@@ -1489,7 +1517,6 @@ namespace PIC
                         RS485.SendCAS();//PD - rev15
                         RS485.SendCRS();//PD - rev15 - report bill jam, etc.... 
                         RS485.PumpGas(sPump);
-                        //int epptester = Convert.ToInt16((sPump), 2);
                         RS485.MyStartTransaction(Convert.ToInt16(sPump), 1);
                     }
                     else if (iKey == 2)
@@ -1500,6 +1527,7 @@ namespace PIC
                         }
                         //RS485.GetReceipt(sPump);
                         RS485.GetReceiptPart1();
+                        RS485.MyStartTransaction(Convert.ToInt16(sPump), 2);
                     }
                     else if (iKey == 13)
                     {
@@ -1508,7 +1536,6 @@ namespace PIC
                             RS485.SendEspanol();
                         }
                         RS485.SendCancel();
-                        ProcessCancel();
                     }
                 } 
                 else if (Display.iScreenMode == 1)
@@ -2277,8 +2304,7 @@ namespace PIC
         static void ProcessCancel()
         {
             CenCom.Reset();
-            //Display.GotoScreen(0, 0);
-            Display.MyGotoMain(1);
+            Display.GotoScreen(0, 0);
             RS485.SendGNI();
         }
     }
@@ -2341,21 +2367,6 @@ namespace PIC
             byte[] comBuffer = new byte[iBytesToRead];
             byte bCurrentByte;
             int i;
-
-            CenCom.i485Monitor = 0;
-
-            if (iStatus < 1)//happens only if was offline
-            {
-                iStatus = 1;
-                Debug.WriteLine("RS485 Online");
-
-                bWaitingForResponse = false;//pd- don't trigger block below if just switched to online (send cas now, not cancel)
-            }
-            else if (bWaitingForResponse == true)//happens each status check....
-            {
-                bWaitingForResponse = false;
-                Debug.WriteLine("RS485 WaitingForResponse Off");
-            }
 
             Debug.WriteLine("RS485 DATA RECEIVED");
             Debug.WriteLine("Bytes to Read: " + iBytesToRead);
@@ -2479,11 +2490,6 @@ namespace PIC
             }
         }
 
-        public static void MySendBill(int iValue)
-        {
-            sTransmit = sTransmit + Convert.ToString((char)0x09) + Convert.ToString((char)iValue);
-        }
-
         public static void MySendKey(int iKey)
         {
             sTransmit = sTransmit + Convert.ToString((char)0x02) + Convert.ToString((char)iKey);
@@ -2550,9 +2556,8 @@ namespace PIC
 
                 try
                 {
-                    if (iCmd == 0x04) //Cash Acceptor
+                    if (iCmd == 0x04)
                     {
-                        CenCom.displayBill = true;
                         if (sReceive[i + 1] == 0)
                         {
                             CashAcceptor.Disable();
@@ -2571,106 +2576,29 @@ namespace PIC
                         }
                         i = i + 2;
                     }
-                    else if (iCmd == 0x03) //Status Request
-                    {
-                        //
-                        Debug.WriteLine("Reached");
-                        //Send back all the statuses
-                        //Send EPP Status
-                        MySendStatus(1, EPP.iStatus);
-                        //Send CA Status
-                        MySendStatus(4, CashAcceptor.iStatus);
-                        MySendStatus(5, Printer.iStatus);
-                        //MySendStatus(3, 0);
-                        i = i + 2;
-
-
-                    }
                     else if (iCmd == 0x10)
                     {
-                        //Parse the string until F0
-
-                        Int16 mylength = Convert.ToInt16(sReceive[i + 2]);
-                        
-                        CenCom.MySetString(Convert.ToInt16(sReceive[i + 1]), sReceive.Substring(i + 3, Convert.ToInt16(sReceive[i + 2])));
-                        i = i + 3 + Convert.ToInt16(sReceive[i + 2]);
+                        CenCom.MySetString(sReceive[i + 1], sReceive.Substring(i + 3, sReceive[i + 2]));
+                        i = i + 3 + sReceive[i + 2];
                     }
                     else if (iCmd == 0x11)
                     {
                         Display.MyGotoMain(sReceive[i + 1]);
-                        i = i + 3;
+                        i = i + 2;
                     }
                     else if (iCmd == 0x12)
                     {
-                        //Display.MyShowMsg(sReceive[i + 1]);
-                        i = i + 3;
+                        Display.MyShowMsg(sReceive[i + 1]);
+                        i = i + 2;
                     }
                     else if (iCmd == 0x13)
                     {
-                                               
                         Display.MyRequestCashCard(sReceive[i + 1]);
-                        i = i + 3;
+                        i = i + 2;
                     }
                     else if (iCmd == 0x14)
                     {
-                        if (CenCom.displayBill)
-                        {
-                            Display.MyShowCashTotal(sReceive[i + 2]);
-                            CenCom.displayBill = false;
-                        }
-                        i = i + 3;
-                    }
-                    else if (iCmd == 0x16)
-                    {
-                        int iPrintLength = 0;
-                        //For each char in sReceive until F0,F3 add to string
-                        int pIndex = i+1;
-                        string sPrintString = "";
-                        bool firstBreak = false;
-                        bool secondBreak = false;
-                        bool continueRead = true;
-                        while (continueRead)
-                        {
-                            
-                            
-                            if(sReceive[pIndex] == 0xF0 && sReceive[pIndex+1] == 0xF3)
-                            {
-                                continueRead = false;
-
-                            }
-                            else
-                            {
-                                iPrintLength++;
-                                pIndex++;
-                            }
-                            
-                        }
-                        //Print the string with substring
-                        Printer.Print(sReceive.Substring(i + 1, iPrintLength));
-                        i = i + 3 + iPrintLength;
-                    }
-                    else if (iCmd == 0x20)
-                    {
-                        //If the index is 86 set string to "Accepting Bill...Please Wait"
-                        int index = Convert.ToInt16(sReceive[i + 1]);
-                        if(index == 86)
-                        {
-                            //CenCom.MySetString(86, "Accepting Bill...Please Wait");
-                            //Display.ShowMessageBox(CenCom.MyGetString(index), 1);
-                           
-                        }
-                        else if(index == 99)
-                        {
-                            CenCom.MySetString(99, "Your Pump is now Ready\n\nPlease return for your Receipt\n\nChange Available Inside at Cashier");
-                            Display.ShowMessageBox(CenCom.MyGetString(index), 5);
-                        }
-                        else if(index == 100)
-                        {
-                            CenCom.MySetString(100, "Sorry your Pump was not Reserved\nPlease see Cashier for Change");
-                            Display.ShowMessageBox(CenCom.MyGetString(index), 5);
-                        }
-                        //Display.MyShowMsg(sReceive[i + 1]);
-                        Display.ShowMessageBox(CenCom.MyGetString(index), 5);
+                        Display.MyShowCashTotal(sReceive[i + 1]);
                         i = i + 2;
                     }
                     else
@@ -2914,9 +2842,9 @@ namespace PIC
         public static void SendCAS()
         {
             string sSend;
-            sSend = CashAcceptor.iStatus.ToString();
-            Debug.WriteLine(sSend);
-            RS485.MySendStatus(4, CashAcceptor.iStatus);
+            sSend = GetCAS();
+            //Debug.WriteLine(sSend);
+            SendData(sSend);
         }
 
         public static string GetCRS()
@@ -2986,16 +2914,12 @@ namespace PIC
 
         public static void SendEnter()
         {
-            sTransmit = sTransmit + Convert.ToString((char)0x05) + Convert.ToString((char)15);
-            //SendData("0X");
+            SendData("KBF001B");
         }
-        public static void SendKeyPress(int iPassKey)
-        {
-            sTransmit = sTransmit + Convert.ToString((char)0x05) + Convert.ToString((char)iPassKey);
-        }
+
         public static void SendCancel()
         {
-            sTransmit = sTransmit + Convert.ToString((char)0x05) + Convert.ToString((char)13);
+            SendData("KBF001J");
         }
 
         public static void SendClear()
@@ -3048,23 +2972,11 @@ namespace PIC
             SendData(sSend);
         }
 
-        public static void MyGetReceipt(int iPump)
-        {
-            Debug.WriteLine("Get Receipt Start- Pump = " + iPump);
-
-            sTransmit = Convert.ToString((char)0x16) + Convert.ToString((char)iPump);
-            //Printer.Print(CenCom.MyGetString(161));
-
-        }
-
         public static void GetReceiptPart1()
         {
             string sSend = "";
 
             sSend = "KBF001b";
-            CenCom.bPrintWait = true;
-            RS485.MyGetReceipt(Convert.ToInt16(CenCom.sPump));
-
 
             Debug.WriteLine("Get Receipt - Part 1: " + sSend);
             SendData(sSend);
@@ -3234,8 +3146,7 @@ namespace PIC
         //public static Form fCurrentForm;
 
         public static Form0 screen0 = new Form0();
-        //public static Form4 screen4 = new Form4();
-
+       
         public static int iType = 1;
 
         public static void Init()
@@ -3243,29 +3154,6 @@ namespace PIC
             iCurrentScreen = 0;
             iScreenMode = 0;
             iMaxInput = 2;
-
-            if(CenCom.inputType == 1)
-            {
-                //Disable Touch Screen Buttons
-                screen0.HideButton(screen0.key1);
-                screen0.HideButton(screen0.button1);
-                screen0.HideButton(screen0.button2);
-                screen0.HideButton(screen0.button3);
-                screen0.HideButton(screen0.button4);
-                screen0.HideButton(screen0.button5);
-                screen0.HideButton(screen0.button6);
-                screen0.HideButton(screen0.button7);
-                screen0.HideButton(screen0.button8);
-                screen0.HideButton(screen0.button9);
-                screen0.HideButton(screen0.button10);
-                screen0.HideButton(screen0.button11);
-                screen0.HideButton(screen0.button12);
-            }
-            else
-            {
-                screen0.ChangeCursor(true);
-            }
-            
 
             //if (iType == 2)
             //{
@@ -3279,7 +3167,6 @@ namespace PIC
             //}
 
             screen0.ShowThis();
-            //screen4.ShowThis();
 
             //myParent.Show();
 
@@ -3289,7 +3176,7 @@ namespace PIC
         {
             Debug.WriteLine("GOTOMAIN: iIndex = " + iIndex + " = " + CenCom.MyGetString(iIndex));
 
-            //screen0.SetText(Display.screen0.lPromptTop, CenCom.MyGetString(iIndex));
+            screen0.SetText(Display.screen0.lPromptTop, CenCom.MyGetString(iIndex));
             GotoScreen(1, 0);
         }
 
@@ -3306,9 +3193,9 @@ namespace PIC
             Debug.WriteLine("SHOW CASH TOTAL: iTotal = " + iTotal);
 
             //screen0.SetText(Display.screen0.lMsg, CenCom.MyGetString(iIndex));
-            Display.screen0.SetText(Display.screen0.lPromptTop, "Press ENTER after last bill\nTotal Amount Accepted:");
-            Display.screen0.SetText(Display.screen0.lPromptBottom, "");
-            Display.screen0.SetText(Display.screen0.lInput, "$" + Convert.ToString(iTotal)); 
+            Display.screen0.SetText(Display.screen0.lPromptTop, "Total dollar amount accepted:");
+            Display.screen0.SetText(Display.screen0.lPromptBottom, "Press ENTER after last bill.");
+            Display.screen0.SetText(Display.screen0.lInput, Convert.ToString(iTotal)); 
             GotoScreen(7, 0);
         }
 
@@ -3333,46 +3220,7 @@ namespace PIC
         public static void MyRequestCashCard(int iIndex)
         {
             screen0.SetText(Display.screen0.lMsg, CenCom.MyGetString(iIndex));
-            GotoScreen(3, 0);
-        }
-        public static void ChangeScreen(int iNextScreen, int iMode)
-        {
-
-        }
-
-        public static void ShowKeypad()
-        {
-            screen0.ShowButton(screen0.key1);
-            screen0.ShowButton(screen0.button1);
-            screen0.ShowButton(screen0.button2);
-            screen0.ShowButton(screen0.button3);
-            screen0.ShowButton(screen0.button4);
-            screen0.ShowButton(screen0.button5);
-            screen0.ShowButton(screen0.button6);
-            screen0.ShowButton(screen0.button7);
-            screen0.ShowButton(screen0.button8);
-            screen0.ShowButton(screen0.button9);
-            screen0.ShowButton(screen0.button10);
-            screen0.ShowButton(screen0.button11);
-            screen0.ShowButton(screen0.button12);
-        }
-
-        public static void HideKeypad()
-        {
-            screen0.HideButton(screen0.key1);
-            screen0.HideButton(screen0.button1);
-            screen0.HideButton(screen0.button2);
-            screen0.HideButton(screen0.button3);
-            screen0.HideButton(screen0.button4);
-            screen0.HideButton(screen0.button5);
-            screen0.HideButton(screen0.button6);
-            screen0.HideButton(screen0.button7);
-            screen0.HideButton(screen0.button8);
-            screen0.HideButton(screen0.button9);
-            screen0.HideButton(screen0.button10);
-            screen0.HideButton(screen0.button11);
-            screen0.HideButton(screen0.button12);
-
+            GotoScreen(3, 2);
         }
 
         public static void GotoScreen(int iNextScreen, int iMode)
@@ -3583,7 +3431,6 @@ namespace PIC
                     CashAcceptor.bHold = false;//PD - rev22
 
                     iMaxInput = 2;
-                    ShowKeypad();
 
                     if (CenCom.iPICID > 0)
                     {
@@ -3594,7 +3441,7 @@ namespace PIC
                         screen0.SetText(Display.screen0.lPrompt, "Out of Service\n\n\n\n\nPIC ID not set.");
                     }
                 }
-                screen0.ShowThis();
+                //screen0.ShowThis();
                 ShowScreen(0, 0);
             }
             else if (iNextScreen == 1)
@@ -3633,7 +3480,7 @@ namespace PIC
                 CenCom.bPreInput = false;
 
                 CenCom.bCashTransaction = false;
-                screen0.SetText(Display.screen0.lPromptTop, "Please enter your Pump Number\nand press Enter");
+
                 ShowScreen(1, 0);
 
                 //if (CenCom.bStartup)
@@ -3678,11 +3525,10 @@ namespace PIC
                     {
                         screen0.SetText(Display.screen0.lPromptTop, "Insert cash");
                     }
-                    screen0.SetCashAnimLocation(250);
-                    //screen0.SetCashAnimLocation(247);
+                    screen0.SetCashAnimLocation(247);
                     //screen0.ShowImage(screen0.pbCashAnim);
                     //screen0.HideImage(screen0.pbCardAnim);
-                    ShowScreen(3, 2);
+                    ShowScreen(3, 0);
                 }
                 else if (iMode == 1)
                 {
@@ -3732,9 +3578,8 @@ namespace PIC
                     {
                         screen0.SetText(Display.screen0.lPromptTop, "Insert cash or card");
                     }
-                    screen0.SetCashAnimLocation(250);
-                    //screen0.SetCashAnimLocation(115);
-                    //screen0.SetCardAnimLocation(444);
+                    screen0.SetCashAnimLocation(115);
+                    screen0.SetCardAnimLocation(444);
                     //screen0.ShowImage(screen0.pbCashAnim);
                     //screen0.ShowImage(screen0.pbCardAnim);
                     ShowScreen(3, 2);
@@ -3875,11 +3720,11 @@ namespace PIC
 
                     if (CenCom.bSpanish)//PD- set here to doesn't get cleared by default (a few statements above)
                     {
-                        screen0.SetText(Display.screen0.lPromptBottom, "Bomba " + CenCom.sPump + " seleccionada.");
+                        screen0.SetText(Display.screen0.lPromptBottom, "\n\nBomba " + CenCom.sPump + " seleccionada.");
                     }
                     else
                     {
-                        screen0.SetText(Display.screen0.lPromptBottom, "Pump " + CenCom.sPump + " selected.");
+                        screen0.SetText(Display.screen0.lPromptBottom, "\n\nPump " + CenCom.sPump + " selected.");
                     }
                 }
 
@@ -3961,7 +3806,7 @@ namespace PIC
                     screen0.SetText(Display.screen0.lMsgBottom, "Select action, press CANCEL when done." + "\n" + "PIC ID: " + CenCom.sPICID + "             " + CenCom.AlarmStatus());
                     screen0.SetText(Display.screen0.lVersion, "Version: " + FileAccess.sVersion);
                 }
-                else if (iMode == 2)
+                else if (iMode == 2) 
                 {
                     screen0.SetText(Display.screen0.lMenu1, "1 - Disable Alarm\n\n4 - Printer Test");
                     screen0.SetText(Display.screen0.lMenu2, "2 - System Test");
@@ -4152,45 +3997,15 @@ namespace PIC
         public static void ShowScreen(int iScreen, int iMode)
         {
 
-            //screen0.ShowImage(screen0.pbBackground);
-
-            screen0.HideImage(screen0.pbLogo1);
-            screen0.HideImage(screen0.pbLogo2);
-            screen0.HideText(screen0.lChoices);
-            screen0.HideText(screen0.lPrompt);
-            screen0.HideText(screen0.lPromptBottom);
-            screen0.HideText(screen0.lPromptChoices);
-            screen0.HideText(screen0.lPromptTop);
-            screen0.HideText(screen0.lVersion);
-            screen0.HideText(screen0.lInput);
-            screen0.HideText(screen0.lInput2);
-            screen0.HideText(screen0.lMenu1);
-            screen0.HideText(screen0.lMenu2);
-            screen0.HideText(screen0.lMenu3);
-            screen0.HideText(screen0.lMsg);
-            screen0.HideText(screen0.lData);
-            screen0.HideText(screen0.lMsgBottom);
-            screen0.HideButton(screen0.Cancel);
-            screen0.HideButton(screen0.Getreceipt);
-            screen0.HideButton(screen0.Pumpgas);
-            screen0.HideImage(screen0.pbCashAnim);
-            screen0.HideImage(screen0.pbCardAnim);
-            screen0.HideButton(screen0.button11);
-            screen0.HideButton(screen0.button13);
-
-
+            screen0.ShowImage(screen0.pbBackground);
 
             if (iScreen == 0)
             {
                 screen0.ShowText(screen0.lPrompt);
                 screen0.ShowText(screen0.lInput);
-                screen0.HideImage(screen0.pbLogo1);
-                screen0.HideImage(screen0.pbLogo2);
-                ShowKeypad();
             }
             else if (iScreen == 1)
             {
-                ShowKeypad();
                 screen0.ShowText(screen0.lPromptTop);
                 if (CenCom.iBrand == 2)
                 {
@@ -4205,27 +4020,18 @@ namespace PIC
             }
             else if (iScreen == 2)
             {
-                ShowKeypad();
                 screen0.ShowText(screen0.lPrompt);
                 screen0.ShowText(screen0.lInput2);
-                screen0.HideImage(screen0.pbLogo1);
-                screen0.HideImage(screen0.pbLogo2);
             }
             else if (iScreen == 3)
             {
                 screen0.ShowText(screen0.lPromptTop);
-                screen0.ShowText(screen0.lPromptBottom);
- 
+                screen0.ShowText(screen0.lPromptBottom); 
                 
                 if (iMode == 2 || iMode == 22)
                 {
                     screen0.ShowImage(screen0.pbCashAnim);
-                    screen0.HideText(screen0.lPromptBottom);
-                    if (CenCom.inputType == 2)
-                    {
-                        screen0.ShowButton(screen0.Cancel);
-                    }
-                    //screen0.ShowImage(screen0.pbCardAnim);
+                    screen0.ShowImage(screen0.pbCardAnim);
                 }
                 else if (iMode == 0 || iMode == 5 || iMode == 55 || iMode == 6)
                 {
@@ -4235,9 +4041,7 @@ namespace PIC
                 else if (iMode == 1 || iMode == 1 || iMode == 4 || iMode == 44 || iMode == 7)
                 {
                     screen0.HideImage(screen0.pbCashAnim);
-                    screen0.ShowButton(screen0.Cancel);
-                    screen0.ShowButton(screen0.button11);
-                    //screen0.ShowImage(screen0.pbCardAnim);
+                    screen0.ShowImage(screen0.pbCardAnim);
                 }
                 else//for safety
                 {
@@ -4245,36 +4049,23 @@ namespace PIC
                     screen0.HideImage(screen0.pbCardAnim);
                 }
             }
-            else if (iScreen == 7) //Dollar Accepted screen
+            else if (iScreen == 7)
             {
                 screen0.ShowText(screen0.lPromptTop);
                 screen0.ShowText(screen0.lPromptBottom);
                 screen0.ShowText(screen0.lInput);
-                screen0.ShowImage(screen0.pbCashAnim);
-                screen0.ShowButton(screen0.Cancel);
-                screen0.ShowButton(screen0.button13);
-
             }
-            else if (iScreen == 8)//Pump gas or receipt choices
+            else if (iScreen == 8)
             {
                 screen0.ShowText(screen0.lPromptChoices);
                 screen0.ShowText(screen0.lChoices);
                 screen0.ShowText(screen0.lPromptBottom);//CE- prompt cleared and only shows pump num selected.
-                HideKeypad();
-                screen0.ShowButton(screen0.Cancel);
-                screen0.ShowButton(screen0.Pumpgas);
-                screen0.ShowButton(screen0.Getreceipt);
             }
             else if (iScreen == 9)
             {
-                screen0.ShowButton(screen0.Cancel);
                 screen0.ShowText(screen0.lPromptTop);
                 screen0.ShowText(screen0.lPromptBottom);
                 screen0.ShowText(screen0.lInput);
-                screen0.ShowImage(screen0.pbCashAnim);
-                screen0.ShowButton(screen0.Cancel);
-                screen0.ShowButton(screen0.Pumpgas);
-
             }
             else if (iScreen == 14)
             {
@@ -4291,7 +4082,6 @@ namespace PIC
                 screen0.ShowText(screen0.lMenu3);
                 screen0.ShowText(screen0.lMsgBottom);
                 screen0.ShowText(screen0.lVersion);
-                ShowKeypad();
             }
             else if (iScreen == 25)
             {
@@ -4302,8 +4092,6 @@ namespace PIC
             {
                 screen0.ShowText(screen0.lPromptTop);
                 screen0.ShowText(screen0.lData);
-                HideKeypad();
-                screen0.ShowButton(screen0.Cancel);
             }
             else if (iScreen == 27)
             {
@@ -4323,17 +4111,13 @@ namespace PIC
                 screen0.ShowText(screen0.lMsgRight);
                 screen0.ShowText(screen0.lPromptBottom);
             }
-            else if (iScreen == 40)
-            {
-                screen0.ShowText(screen0.lPromptTop);
-            }
 
             screen0.ShowThis();
         }
 
         public static void ShowMessageBox(string sText, int iTimer)
         {
-            //bMsgBoxShowing = true;
+            bMsgBoxShowing = true;
 
             CenCom.iMsgBoxTimer = iTimer;
 
@@ -5060,71 +4844,60 @@ namespace PIC
 
         public static void CheckStatus()
         {
+            int i;
+            byte[] bSend = new byte[] { 2, 1, 0, 16, 3, 18 };
+            bWaitingForResponse = true;
 
-            if (CenCom.inputType == 2)
+            Debug.WriteLine("*******************************FMI2222");
+            try
             {
-                //Force Touchscreen iStatus to 1
-                iStatus = 1;
-                bWaitingForResponse = false;
-            }
-            else
-            {
-
-                int i;
-                byte[] bSend = new byte[] { 2, 1, 0, 16, 3, 18 };
-                bWaitingForResponse = true;
-
-                Debug.WriteLine("*******************************FMI2222");
-                try
+                if (PortEPP.IsOpen == false)
                 {
-                    if (PortEPP.IsOpen == false)
-                    {
-                        PortEPP.Open();
+                    PortEPP.Open();
 
-                        Debug.WriteLine("EPP Port not opened... Trying to open port...");
-                    }
-                    else
+                    Debug.WriteLine("EPP Port not opened... Trying to open port...");
+                }
+                else
+                {
+                    PortEPP.DiscardOutBuffer();
+                    PortEPP.Write(bSend, 0, 6);
+                    if (CenCom.iLoggingEPP == 1)
                     {
-                        PortEPP.DiscardOutBuffer();
-                        PortEPP.Write(bSend, 0, 6);
-                        if (CenCom.iLoggingEPP == 1)
+                        WriteLogData_TX(Environment.NewLine + "TX> " + DateTime.Now.ToString("HH:mm:ss:ffff") + " -- ");
+                        for (i = 0; i < 6; i++)
                         {
-                            WriteLogData_TX(Environment.NewLine + "TX> " + DateTime.Now.ToString("HH:mm:ss:ffff") + " -- ");
-                            for (i = 0; i < 6; i++)
-                            {
-                                WriteLogData_TX(String.Format("{0:X2}", bSend[i]) + " ");
-                            }
+                            WriteLogData_TX(String.Format("{0:X2}", bSend[i]) + " ");
                         }
-                        bEncryptionEnabled = false;
-
-                        Debug.WriteLine("Checking EPP status", DateTime.Now.ToString("h:mm:ss.fff"));
-                        Debug.WriteLine(bSend[0] + "-" + bSend[1] + "-" + bSend[2] + "-" + bSend[3] + "-" + bSend[4] + "-" + bSend[5]);
                     }
-                    //return true;
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine("EPP ERROR: ");
-                    Debug.WriteLine(ex.Message);
-                    //return false;
-                }
-                //try
-                //{
-                //    if (PortEPP.IsOpen == false)
-                //    {
-                //        PortEPP.Open();
-                //    }
-                //    PortEPP.Write(bSend, 0, 6);
+                    bEncryptionEnabled = false;
 
-                //    bEncryptionEnabled = false;
-
-                //    Debug.WriteLine("Checking EPP status", DateTime.Now.ToString("h:mm:ss.fff"));
-                //}
-                //catch (Exception ex)
-                //{
-                //    Debug.WriteLine(ex.Message);
-                //}
+                    Debug.WriteLine("Checking EPP status", DateTime.Now.ToString("h:mm:ss.fff"));
+                    Debug.WriteLine(bSend[0] + "-" + bSend[1] + "-" + bSend[2] + "-" + bSend[3] + "-" + bSend[4] + "-" + bSend[5]);
+                }
+                //return true;
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("EPP ERROR: ");
+                Debug.WriteLine(ex.Message);
+                //return false;
+            }
+            //try
+            //{
+            //    if (PortEPP.IsOpen == false)
+            //    {
+            //        PortEPP.Open();
+            //    }
+            //    PortEPP.Write(bSend, 0, 6);
+
+            //    bEncryptionEnabled = false;
+
+            //    Debug.WriteLine("Checking EPP status", DateTime.Now.ToString("h:mm:ss.fff"));
+            //}
+            //catch (Exception ex)
+            //{
+            //    Debug.WriteLine(ex.Message);
+            //}
         }
 
         public static bool Initialize()
@@ -5406,7 +5179,6 @@ namespace PIC
             int iByteRead;
 
             Debug.WriteLine("CR Data Received");
-
             Debug.WriteLine("CR bytes to read: "+bytes);
 
             try
@@ -5938,7 +5710,6 @@ namespace PIC
 
         public static bool bWaitingForResponse = false;
         public static int iStatus = 0;
-        public static int iEmcastatus = 1;
         static int iPreviousStatus = 0;
         public static string sStatus = "";
 
@@ -5978,11 +5749,7 @@ namespace PIC
             PortCA.ReadTimeout = 1000;//my need to change...
 
             PortCA.DataReceived += new SerialDataReceivedEventHandler(PortCA_DataReceived);
-            if(CenCom.bEmMode == 1)
-            {
-                iStatus = 1;
-                RS485.SendCAS();
-            }
+
             try
             {
                 PortCA.Open();
@@ -6016,8 +5783,8 @@ namespace PIC
                 Debug.WriteLine("CA WaitingForResponse Off");
             }
 
-            //if (CenCom.bBillRequest == true)//report status even if not in bill accepting mode (eg cassette removed or bill jam when power up)
-            //{
+            if (CenCom.bBillRequest == true)//report status even if not in bill accepting mode (eg cassette removed or bill jam when power up)
+            {
 
                 PortCA.Read(comBuffer, 0, iBytesToRead);
                 for (i = 0; i < iBytesToRead; i++)
@@ -6098,37 +5865,30 @@ namespace PIC
                         if ((iStatusByte2 & 56) == 8)//PD- 14- read bill early so CAS reports current value
                         {
                             iBillVal = 1;
-                            //Display.ShowMessageBox("Adding $1", 2);
                         }
                         else if ((iStatusByte2 & 56) == 16)
                         {
                             iBillVal = 2;
-                            //Display.ShowMessageBox("Adding $2", 2);
                         }
                         else if ((iStatusByte2 & 56) == 24)
                         {
                             iBillVal = 5;
-                            //Display.ShowMessageBox("Adding $5", 2);
                         }
                         else if ((iStatusByte2 & 56) == 32)
                         {
                             iBillVal = 10;
-                            //Display.ShowMessageBox("Adding $10", 2);
                         }
                         else if ((iStatusByte2 & 56) == 40)
                         {
                             iBillVal = 20;
-                            //Display.ShowMessageBox("Adding $20", 2);
                         }
                         else if ((iStatusByte2 & 56) == 48)
                         {
                             iBillVal = 50;
-                            //Display.ShowMessageBox("Adding $50", 2);
                         }
                         else if ((iStatusByte2 & 56) == 56)
                         {
                             iBillVal = 100;
-                            //Display.ShowMessageBox("Adding $100", 2);
                         }
                         else
                         {
@@ -6144,9 +5904,7 @@ namespace PIC
                             {
                                 Display.screen0.SetText(Display.screen0.lPromptTop, "Last Bill Value: " + iBillVal);
                             }
-                            Return(); //must be for testing screen
-
-                            
+                            Return();
                             iBillVal = 0;
                         }
 
@@ -6163,7 +5921,7 @@ namespace PIC
 
                             sStatus = "Cassette Removed";
                             iStatus = 13;
-                        } //Cassette Removed and other functions
+                        } 
                         else if ((iStatusByte1 & 4) == 4)
                         {
                             sStatus = "Bill Jammed";
@@ -6278,26 +6036,6 @@ namespace PIC
                                 sStatus = "Escrowed";
                                 iStatus = 4;
                                 dStartTime = DateTime.Now;
-                                //Send CAS and NEW Bill
-                                try
-                                {
-                                    //RS485.SendCAS();
-                                    if (Display.iCurrentScreen == 7)
-                                    {
-                                        Display.screen0.SetText(Display.screen0.lPromptTop, "Accepting $" + iBillVal + ". Please Wait...");
-                                    }
-                                    if (CenCom.bBillRequest)
-                                    {
-                                        RS485.MySendBill(iBillVal);
-                                        RS485.MySendStatus(4, iStatus);
-                                    }
-                                    
-                                }
-                                catch 
-                                {
-
-                                   
-                                }
                             }
                             else if (iPreviousStatus != 4)//PD - so don't repeat
                             {
@@ -6310,7 +6048,7 @@ namespace PIC
                                     }
                                     catch { }
                                 }
-                                //Return();
+                                Return();
                             }
                         }
                         else if ((iStatusByte0 & 2) == 2)
@@ -6373,11 +6111,11 @@ namespace PIC
                         sStatus = "";
                     }   
                 }
-            //}
-            //else
-            //{
-            //    Debug.WriteLine("Purge CA: " + PortCA.ReadExisting());
-            //}
+            }
+            else
+            {
+                Debug.WriteLine("Purge CA: " + PortCA.ReadExisting());
+            }
         }
 
         static void ChangeStatus()
@@ -6419,7 +6157,7 @@ namespace PIC
                         catch { }
                     }
 
-                    if (iStatus == 2 && iPreviousStatus == 5) //Bill has been accepted and state is returned to Enabled. So we know the bill was accepted properly
+                    if (iStatus == 2 && iPreviousStatus == 5)
                     {
                         iStatus = 7;
                         iBillTotal = iBillTotal + iBillVal;
@@ -6457,9 +6195,9 @@ namespace PIC
                     //    //don't send if escrow status appears after returning status...
                     //}
                     
-                    if (iStatus == 13)//PD- rev22 //Cassette Removed
+                    if (iStatus == 13)//PD- rev22
                     {
-                        if (iPreviousStatus == 5 && (iStatusByte0 & 16) == 16)//PD- rev22 //bill stacked properly
+                        if (iPreviousStatus == 5 && (iStatusByte0 & 16) == 16)//PD- rev22
                         {
                             sStatus = "Stacked";
                             iStatus = 7;
@@ -6588,7 +6326,7 @@ namespace PIC
                         }
                         Return();
                     }
-                    else if (iStatus == 8) //Bill returning
+                    else if (iStatus == 8)
                     {
                         if (CenCom.iLoggingCA == 1)
                         {
@@ -6625,56 +6363,47 @@ namespace PIC
 
         public static void CheckStatus()
         {
-            if (CenCom.bEmMode == 1)
+            //Debug.WriteLine("CA CHECK STATUS.........................");
+            bWaitingForResponse = true;
+
+            byte[] bSend = new byte[7];
+            byte bcc = 0;
+            int i;
+
+            bSend[0] = 2;
+            bSend[1] = 7;
+            bSend[2] = (byte)(16 + iMsgNum);
+            iMsgNum = NextMsg();
+            bSend[3] = 0;
+            bSend[4] = 0;
+            //bSend[5] = 0;
+            bSend[5] = 3;
+
+            for (i = 1; i < 5; i++)
             {
-                //Send manual status and turn bWaitingForResponse Off
-                bWaitingForResponse = false;
-                iStatus = iEmcastatus;
+                bcc = (byte)(bcc ^ bSend[i]);
+                //Debug.WriteLine(i);
+                //Debug.WriteLine(bcc);
             }
-            else
+            bSend[6] = bcc;
+
+            try
             {
-                //Debug.WriteLine("CA CHECK STATUS.........................");
-                bWaitingForResponse = true;
-
-                byte[] bSend = new byte[7];
-                byte bcc = 0;
-                int i;
-
-                bSend[0] = 2;
-                bSend[1] = 7;
-                bSend[2] = (byte)(16 + iMsgNum);
-                iMsgNum = NextMsg();
-                bSend[3] = 0;
-                bSend[4] = 0;
-                //bSend[5] = 0;
-                bSend[5] = 3;
-
-                for (i = 1; i < 5; i++)
+                if (PortCA.IsOpen == false)
                 {
-                    bcc = (byte)(bcc ^ bSend[i]);
-                    //Debug.WriteLine(i);
-                    //Debug.WriteLine(bcc);
+                    PortCA.Open();
                 }
-                bSend[6] = bcc;
-
-                try
+                PortCA.Write(bSend, 0, 7);
+                
+                Debug.WriteLine("Checking CA status", DateTime.Now.ToString("h:mm:ss.fff"));
+                for (i = 0; i < 7; i++)
                 {
-                    if (PortCA.IsOpen == false)
-                    {
-                        PortCA.Open();
-                    }
-                    PortCA.Write(bSend, 0, 7);
-
-                    Debug.WriteLine("Checking CA status", DateTime.Now.ToString("h:mm:ss.fff"));
-                    for (i = 0; i < 7; i++)
-                    {
-                        Debug.Write(bSend[i] + "-");
-                    }
+                    Debug.Write(bSend[i] + "-");
                 }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine(ex.Message);
-                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
             }
         }
 
@@ -6683,8 +6412,6 @@ namespace PIC
             byte[] bSend = new byte[7];
             byte bcc = 0;
             int i;
-
-            
 
             bSend[0] = 2;
             bSend[1] = 7;
@@ -6726,8 +6453,6 @@ namespace PIC
             byte[] bSend = new byte[7];
             byte bcc = 0;
             int i;
-
-            bStack = true;
 
             bSend[0] = 2;
             bSend[1] = 7;
@@ -6777,8 +6502,6 @@ namespace PIC
             byte[] bSend = new byte[7];
             byte bcc = 0;
             int i;
-
-            bStack = false;
 
             bSend[0] = 2;
             bSend[1] = 7;
@@ -6948,7 +6671,6 @@ namespace PIC
                 PortPTR.BaudRate = 9600;
                 PortPTR.StopBits = StopBits.One;
                 PortPTR.Parity = Parity.None;
-
                 PortPTR.DataBits = 8;
                 PortPTR.PortName = "COM" + iPortNum;
                 PortPTR.Handshake = Handshake.None;
@@ -7690,10 +7412,10 @@ namespace PIC
             Debug.WriteLine(FileAccess.sSettings);
 
             RS485.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<RS_PORT>") + 9, 1));
-            EPP.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<KP_PORT>") + 9, 2));
+            EPP.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<KP_PORT>") + 9, 1));
             CashAcceptor.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<CA_PORT>") + 9, 1));
             CardReader.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<CR_PORT>") + 9, 1));
-            Printer.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<PR_PORT>") + 9, 2));
+            Printer.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<PR_PORT>") + 9, 1));
             EPP.iEncryptionMethod = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<ENC_METHOD>") + 12, 1));
             CenCom.iPICID = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<PICID>") + 7, 1));
             CenCom.sPICID = Convert.ToString(CenCom.iPICID);
@@ -7775,8 +7497,6 @@ namespace PIC
             RS485.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<RS_PORT>") + 9, 1));
             EPP.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<KP_PORT>") + 9, 2));
             CashAcceptor.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<CA_PORT>") + 9, 1));
-            CenCom.bEmMode = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<EM_MODE>") + 9, 1));
-            CenCom.inputType = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<INPUT_TYPE>") + 12, 1));
             CardReader.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<CR_PORT>") + 9, 1));
             Printer.iPortNum = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<PR_PORT>") + 9, 1));
             EPP.iEncryptionMethod = Convert.ToInt16(sSettings.Substring(sSettings.IndexOf("<ENC_METHOD>") + 12, 1));
